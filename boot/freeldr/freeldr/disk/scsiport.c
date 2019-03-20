@@ -264,6 +264,9 @@ static ARC_STATUS DiskRead(ULONG FileId, VOID* Buffer, ULONG N, ULONG* Count)
     ULONG FullSectors, NbSectors;
     ULONG Lba;
 
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
+
     *Count = 0;
 
     if (N == 0)
@@ -1615,6 +1618,7 @@ LoadBootDeviceDriver(VOID)
 
     /* Load file */
     Success = WinLdrLoadImage(NtBootDdPath, LoaderBootDriver, &ImageBase);
+    ERR("%s %d\n", __FILE__, __LINE__);
     if (!Success)
     {
         /* That's OK. File simply doesn't exist */

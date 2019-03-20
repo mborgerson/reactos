@@ -281,13 +281,20 @@ WinLdrLoadImage(IN PCHAR FileName,
     ULONG i, BytesRead;
     TRACE("WinLdrLoadImage(%s, %ld, *)\n", FileName, MemoryType);
 
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
     /* Open the image file */
     Status = ArcOpen(FileName, OpenReadOnly, &FileId);
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
     if (Status != ESUCCESS)
     {
         // UiMessageBox("Can not open the file.");
         return FALSE;
     }
+
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
 
     /* Load the first 2 sectors of the image so we can read the PE header */
     Status = ArcRead(FileId, HeadersBuffer, SECTOR_SIZE * 2, &BytesRead);

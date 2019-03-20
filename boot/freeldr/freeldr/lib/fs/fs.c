@@ -146,6 +146,9 @@ ARC_STATUS ArcOpen(CHAR* Path, OPENMODE OpenMode, ULONG* FileId)
                     return ESUCCESS;
                 }
 
+                    TRACE("%s:%d\n", __FILE__, __LINE__);
+
+
                 /* Try to detect the file system */
 #ifndef _M_ARM
                 FileData[DeviceId].FileFuncTable = IsoMount(DeviceId);

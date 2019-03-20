@@ -119,6 +119,7 @@ BOOLEAN DiskGetBootPath(OUT PCHAR BootPath, IN ULONG Size)
     else if (FrldrBootPartition == 0xFF)
     {
         /* Boot Partition 0xFF is the magic value that indicates booting from CD-ROM (see isoboot.S) */
+        ERR("\n\nCDROM!\n\n");
         sprintf(FrldrBootPath, "multi(0)disk(0)cdrom(%u)", FrldrBootDrive - 0x80);
     }
     else

@@ -304,6 +304,7 @@ enum
 static
 void WinLdrSetupSpecialDataPointers(VOID)
 {
+#if 0
     REGS BiosRegs;
 
     /* Get the address of the bios rom fonts. Win 2003 videoprt reads these
@@ -347,10 +348,11 @@ void WinLdrSetupSpecialDataPointers(VOID)
     }
     else
     {
+#endif
         WARN("Couldn't get address of extended BIOS data area\n");
         *ExtendedBIOSDataArea = 0;
         *ExtendedBIOSDataSize = 0;
-    }
+    // }
 }
 
 void WinLdrSetupMachineDependent(PLOADER_PARAMETER_BLOCK LoaderBlock)

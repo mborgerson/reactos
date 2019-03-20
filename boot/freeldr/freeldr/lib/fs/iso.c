@@ -496,6 +496,9 @@ const DEVVTBL* IsoMount(ULONG DeviceId)
     ULONG Count;
     ARC_STATUS Status;
 
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
+
     //
     // Read The Primary Volume Descriptor
     //
@@ -504,9 +507,18 @@ const DEVVTBL* IsoMount(ULONG DeviceId)
     Status = ArcSeek(DeviceId, &Position, SeekAbsolute);
     if (Status != ESUCCESS)
         return NULL;
+
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
     Status = ArcRead(DeviceId, Pvd, SECTORSIZE, &Count);
+
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
     if (Status != ESUCCESS || Count < sizeof(PVD))
         return NULL;
+
+    TRACE("%s:%d\n", __FILE__, __LINE__);
+
 
     //
     // Check if PVD is valid. If yes, return ISO9660 function table

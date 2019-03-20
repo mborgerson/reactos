@@ -145,6 +145,8 @@ XboxHwDetect(VOID)
     PCONFIGURATION_COMPONENT_DATA SystemKey;
     ULONG BusNumber = 0;
 
+    // asm volatile ("jmp .");
+
     TRACE("DetectHardware()\n");
 
     /* Create the 'System' key */
@@ -176,6 +178,10 @@ XboxMachInit(const char *CmdLine)
     /* Initialize our stuff */
     XboxMemInit();
     XboxVideoInit();
+
+
+    // DiskReadBuffer = XboxMemReserveMemory(1);
+    // DiskReadBufferSize = MAX_DISKREADBUFFER_SIZE;
 
     /* Setup vtbl */
     MachVtbl.ConsPutChar = XboxConsPutChar;

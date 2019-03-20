@@ -286,6 +286,7 @@ DetectBiosFloppyController(PCONFIGURATION_COMPONENT_DATA BusKey)
     ULONG FloppyCount;
 
     FloppyCount = GetFloppyCount();
+    FloppyCount = 0;
     TRACE("Floppy count: %u\n", FloppyCount);
 
     /* Always create a BIOS disk controller, no matter if we have floppy drives or not */

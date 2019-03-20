@@ -19,7 +19,13 @@
  * by the Xbox Linux group: http://www.xbox-linux.org
  */
 
+
 #include <freeldr.h>
+#include <arch/pc/x86common.h>
+
+#include <debug.h>
+
+DBG_DEFAULT_CHANNEL(MEMORY);
 
 static ULONG InstalledMemoryMb = 0;
 static ULONG AvailableMemoryMb = 0;
@@ -74,15 +80,15 @@ XboxMemInit(VOID)
   AvailableMemoryMb = InstalledMemoryMb;
 }
 
+#if 0
 FREELDR_MEMORY_DESCRIPTOR XboxMemoryMap[2];
 
 PFREELDR_MEMORY_DESCRIPTOR
 XboxMemGetMemoryMap(ULONG *MemoryMapSize)
 {
-  /* Synthesize memory map */
       /* Available RAM block */
-      XboxMemoryMap[0].BasePage = 0;
-      XboxMemoryMap[0].PageCount = AvailableMemoryMb * 1024 * 1024 / MM_PAGE_SIZE;
+      XboxMemoryMap[0].BasePage = 0x100000;
+      XboxMemoryMap[0].PageCount = (AvailableMemoryMb -1) * 1024 * 1024 / MM_PAGE_SIZE;
       XboxMemoryMap[0].MemoryType = LoaderFree;
 
       /* Video memory */
@@ -91,8 +97,10 @@ XboxMemGetMemoryMap(ULONG *MemoryMapSize)
       XboxMemoryMap[1].MemoryType = LoaderFirmwarePermanent;
 
   *MemoryMapSize = 2;
+
   return XboxMemoryMap;
 }
+#endif
 
 PVOID
 XboxMemReserveMemory(ULONG MbToReserve)
@@ -114,5 +122,179 @@ XboxMemReserveMemory(ULONG MbToReserve)
   /* Top of available memory points to the space just reserved */
   return (PVOID) (AvailableMemoryMb * 1024 * 1024);
 }
+
+
+
+
+// DBG_DEFAULT_CHANNEL(MEMORY);
+
+#define ULONGLONG_ALIGN_DOWN_BY(size, align) \
+    ((ULONGLONG)(size) & ~((ULONGLONG)(align) - 1))
+
+#define ULONGLONG_ALIGN_UP_BY(size, align) \
+    (ULONGLONG_ALIGN_DOWN_BY(((ULONGLONG)(size) + align - 1), align))
+
+#define MAX_BIOS_DESCRIPTORS 80ul
+FREELDR_MEMORY_DESCRIPTOR PcMemoryMap[MAX_BIOS_DESCRIPTORS + 1];
+ULONG PcMapCount;
+
+ULONG
+AddMemoryDescriptor(
+    IN OUT PFREELDR_MEMORY_DESCRIPTOR List,
+    IN ULONG MaxCount,
+    IN PFN_NUMBER BasePage,
+    IN PFN_NUMBER PageCount,
+    IN TYPE_OF_MEMORY MemoryType);
+
+static
+VOID
+ReserveMemory(
+    ULONG_PTR BaseAddress,
+    SIZE_T Size,
+    TYPE_OF_MEMORY MemoryType,
+    PCHAR Usage)
+{
+    ULONG_PTR BasePage, PageCount;
+    ULONG i;
+
+    BasePage = BaseAddress / PAGE_SIZE;
+    PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(BaseAddress, Size);
+
+    for (i = 0; i < PcMapCount; i++)
+    {
+        /* Check for conflicting descriptor */
+        if ((PcMemoryMap[i].BasePage < BasePage + PageCount) &&
+            (PcMemoryMap[i].BasePage + PcMemoryMap[i].PageCount > BasePage))
+        {
+            /* Check if the memory is free */
+            if (PcMemoryMap[i].MemoryType != LoaderFree)
+            {
+                FrLdrBugCheckWithMessage(
+                    MEMORY_INIT_FAILURE,
+                    __FILE__,
+                    __LINE__,
+                    "Failed to reserve memory in the range 0x%Ix - 0x%Ix for %s",
+                    BaseAddress,
+                    Size,
+                    Usage);
+            }
+        }
+    }
+
+    /* Add the memory descriptor */
+    PcMapCount = AddMemoryDescriptor(PcMemoryMap,
+                                     MAX_BIOS_DESCRIPTORS,
+                                     BasePage,
+                                     PageCount,
+                                     MemoryType);
+}
+
+static
+VOID
+SetMemory(
+    ULONG_PTR BaseAddress,
+    SIZE_T Size,
+    TYPE_OF_MEMORY MemoryType)
+{
+    ULONG_PTR BasePage, PageCount;
+
+    BasePage = BaseAddress / PAGE_SIZE;
+    PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(BaseAddress, Size);
+
+    /* Add the memory descriptor */
+    PcMapCount = AddMemoryDescriptor(PcMemoryMap,
+                                     MAX_BIOS_DESCRIPTORS,
+                                     BasePage,
+                                     PageCount,
+                                     MemoryType);
+}
+
+PFREELDR_MEMORY_DESCRIPTOR
+XboxMemGetMemoryMap(ULONG *MemoryMapSize)
+{
+    ULONG i;
+
+    TRACE("XboxMemGetMemoryMap()\n");
+
+    // XboxMemCheckUsableMemorySize();
+
+    /* Setup some protected ranges */
+    SetMemory(0x000000, 0x01000, LoaderFirmwarePermanent); // Realmode IVT / BDA
+    SetMemory(0x0A0000, 0x50000, LoaderFirmwarePermanent); // Video memory
+    SetMemory(0x0F0000, 0x10000, LoaderSpecialMemory); // ROM
+    SetMemory(0xFFF000, 0x01000, LoaderSpecialMemory); // unusable memory (do we really need this?)
+
+    /* Reserve some static ranges for freeldr */
+    ReserveMemory(0x1000, STACKLOW - 0x1000, LoaderFirmwareTemporary, "BIOS area");
+    ReserveMemory(STACKLOW, STACKADDR - STACKLOW, LoaderOsloaderStack, "FreeLdr stack");
+    ReserveMemory(FREELDR_BASE, FrLdrImageSize, LoaderLoadedProgram, "FreeLdr image");
+
+    SetMemory(
+      FREELDR_BASE + FrLdrImageSize,
+      (AvailableMemoryMb * 1024 * 1024) - (FREELDR_BASE + FrLdrImageSize),
+      LoaderFree);
+
+    ReserveMemory(
+      AvailableMemoryMb * 1024 * 1024,
+      (InstalledMemoryMb-AvailableMemoryMb) * 1024 * 1024,
+      LoaderFirmwarePermanent,
+      "Video RAM");
+
+
+    /* Default to 1 page above freeldr for the disk read buffer */
+    DiskReadBuffer = (PUCHAR)ALIGN_UP_BY(FREELDR_BASE + FrLdrImageSize, PAGE_SIZE);
+    DiskReadBufferSize = PAGE_SIZE;
+
+    /* Scan for free range above freeldr image */
+    for (i = 0; i < PcMapCount; i++)
+    {
+        if ((PcMemoryMap[i].BasePage > (FREELDR_BASE / PAGE_SIZE)) &&
+            (PcMemoryMap[i].MemoryType == LoaderFree))
+        {
+            /* Use this range for the disk read buffer */
+            DiskReadBuffer = (PVOID)(PcMemoryMap[i].BasePage * PAGE_SIZE);
+            DiskReadBufferSize = min(PcMemoryMap[i].PageCount * PAGE_SIZE,
+                                     MAX_DISKREADBUFFER_SIZE);
+            break;
+        }
+    }
+
+    TRACE("DiskReadBuffer=%p, DiskReadBufferSize=%lx\n",
+          DiskReadBuffer, DiskReadBufferSize);
+
+    /* Now reserve the range for the disk read buffer */
+    ReserveMemory((ULONG_PTR)DiskReadBuffer,
+                  DiskReadBufferSize,
+                  LoaderFirmwareTemporary,
+                  "Disk read buffer");
+
+    TRACE("Dumping resulting memory map:\n");
+    for (i = 0; i < PcMapCount; i++)
+    {
+        TRACE("BasePage=0x%lx, PageCount=0x%lx, Type=%s\n",
+              PcMemoryMap[i].BasePage,
+              PcMemoryMap[i].PageCount,
+              MmGetSystemMemoryMapTypeString(PcMemoryMap[i].MemoryType));
+    }
+
+    *MemoryMapSize = PcMapCount;
+    return PcMemoryMap;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* EOF */

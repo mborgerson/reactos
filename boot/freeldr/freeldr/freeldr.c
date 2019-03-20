@@ -33,6 +33,12 @@ VOID __cdecl BootMain(IN PCCH CmdLine)
     /* Debugger pre-initialization */
     DebugInit(FALSE);
 
+    FrldrBootDrive = 0x80;
+    FrldrBootPartition = 0x00;
+
+    // FrldrBootDrive = 0x80;
+    // FrldrBootPartition = 0xFF;
+
     TRACE("BootMain() called.\n");
 
     MachInit(CmdLine);

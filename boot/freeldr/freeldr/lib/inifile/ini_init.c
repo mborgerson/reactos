@@ -45,6 +45,8 @@ BOOLEAN IniFileInitialize(VOID)
     BOOLEAN Success;
     TRACE("IniFileInitialize()\n");
 
+    // asm volatile ("jmp .");
+
     //
     // Open freeldr.ini
     //
